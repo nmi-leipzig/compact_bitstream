@@ -28,12 +28,6 @@ def bitstream_from_args(in_stream: BinaryIO, args: Namespace) -> bytes:
 	
 	return config.get_bitstream(opt)
 
-def rewrite(args: Namespace) -> None:
-	bitstream = bitstream_from_args(args)
-	
-	with open(args.output_bin, "wb") as bin_file:
-		bin_file.write(bitstream)
-
 def benchmark(in_stream: BinaryIO, args: Namespace) -> List[float]:
 	bitstream = bitstream_from_args(in_stream, args)
 	
@@ -80,7 +74,19 @@ def run(args: Namespace) -> None:
 					out_grp.create_dataset(name, data=data, dtype=dtype, compression="gzip", compression_opts=9)
 			else:
 				out_grp = hdf5_file.create_dataset(args.result_path, data=res[0], dtype=dtype, compression="gzip", compression_opts=9)
-			#TODO: set out_grp attributes to args
+			
+			# set args as out_grp attributes
+			out_grp.attrs.create("optimization_level", data=args.level, dtype="uint8")
+			for attr_name, dtype in [("chip_type", str), ("bram_banks", "uint8"), ("skip_comment", bool), ("bram_chunk_size", "uint16")]:#
+				value = getattr(args, attr_name)
+				if value is None:
+					out_grp.attrs[attr_name] = h5py.Empty(dtype)
+					continue
+				if dtype is str:
+					out_grp.attrs[attr_name] = value
+					continue
+				out_grp.attrs.create(attr_name, data=value, dtype=dtype)
+			
 		elif args.function == benchmark:
 			print(res)
 		
@@ -88,8 +94,6 @@ def run(args: Namespace) -> None:
 			with open(args.output_bin, "wb") as bin_file:
 				bin_file.write(res[0])
 			
-		
-	#in_args.function(in_args)	
 
 def create_arg_parser() -> ArgumentParser:
 	parser = ArgumentParser()
@@ -112,7 +116,7 @@ def create_arg_parser() -> ArgumentParser:
 	rewrite_parser.add_argument("-o", "--output-bin", type=str, help="output file for the binary bitstream")
 	rewrite_parser.set_defaults(function=bitstream_from_args)
 	
-	benchmark_parser = sub_parsers.add_parser("benchmark", help="measure the configuration time of the bitstream according  to the arguments")
+	benchmark_parser = sub_parsers.add_parser("benchmark", help="measure the configuration time of the bitstream according to the arguments")
 	benchmark_parser.add_argument("-n", "--number", default=1, type=int, help="number of times the configuration is done during one measurement")
 	benchmark_parser.add_argument("-r", "--repeat", default=10, type=int, help="number of measurements taken")
 	benchmark_parser.set_defaults(function=benchmark)
