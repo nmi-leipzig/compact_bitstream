@@ -2,3 +2,7 @@
 *.prj
 __pycache__/
 tmp.*
+
+*.bin
+*.asc
+*.h5
