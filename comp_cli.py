@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import statistics
+import time
 import timeit
 
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
 from io import BytesIO
-from typing import BinaryIO, List
+from typing import Any, BinaryIO, Callable, List, Tuple
 
 import h5py
 
@@ -36,6 +37,13 @@ def benchmark(in_stream: BinaryIO, args: Namespace) -> List[float]:
 	
 	return res
 
+def exec_time(func: Callable, *args, **kwargs) -> Tuple[Any, float]:
+	start = time.perf_counter()
+	res = func(*args, **kwargs)
+	end = time.perf_counter()
+	
+	return res, end-start
+
 def run(args: Namespace) -> None:
 	with ExitStack() as stack:
 		in_batch = []
@@ -56,7 +64,9 @@ def run(args: Namespace) -> None:
 				ds_list = [n[1] for n in name_ds_list]
 			in_batch.extend([BytesIO(d[:].tobytes()) for d in ds_list])
 		
-		res = [args.function(b, args) for b in in_batch]
+		timing_res = [exec_time(args.function, b, args) for b in in_batch]
+		res = [r[0] for r in timing_res]
+		timing = [r[1] for r in timing_res]
 		
 		if hdf5_file and args.result_path:
 			if args.function == benchmark:
@@ -70,10 +80,12 @@ def run(args: Namespace) -> None:
 					out_grp = hdf5_file[args.result_path]
 				except KeyError:
 					out_grp = hdf5_file.create_group(args.result_path)
-				for name, data in zip(name_list, res):
-					out_grp.create_dataset(name, data=data, dtype=dtype, compression="gzip", compression_opts=9)
+				for name, data, seconds in zip(name_list, res, timing):
+					dataset = out_grp.create_dataset(name, data=data, dtype=dtype, compression="gzip", compression_opts=9)
+					dataset.attrs.create("execution_time_in_s", data=seconds, dtype=float)
 			else:
 				out_grp = hdf5_file.create_dataset(args.result_path, data=res[0], dtype=dtype, compression="gzip", compression_opts=9)
+				out_grp.attrs.create("execution_time_in_s", data=timing[0], dtype=float)
 			
 			# set args as out_grp attributes
 			out_grp.attrs.create("optimization_level", data=args.level, dtype="uint8")
