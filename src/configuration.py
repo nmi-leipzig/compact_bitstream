@@ -428,6 +428,7 @@ class Configuration:
 				bin_out.set_bank_offset(0, reuse)
 		
 		# write CRAM
+		granularity = np.lcm(self._spec.cram_width, 8)//self._spec.cram_width
 		for bank_number in out_banks:
 			bin_out.set_bank_number(bank_number, reuse)
 			
@@ -438,6 +439,9 @@ class Configuration:
 			
 			# find none False rows
 			to_write = np.any(cram[bank_number], axis=1)
+			if granularity > 1:
+				to_write.resize((len(to_write)//granularity, granularity))
+				to_write = np.any(to_write, axis=1)
 			#print(np.nonzero(to_write))
 			prev_write = np.roll(to_write, 1)
 			prev_write[0] = False
@@ -454,8 +458,8 @@ class Configuration:
 			
 			for bank_offset, bank_height in areas:
 				#print(f"{bank_offset}, {bank_height}")
-				bin_out.set_bank_height(int(bank_height), True)
-				bin_out.set_bank_offset(int(bank_offset), True)
+				bin_out.set_bank_height(int(bank_height*granularity), True)
+				bin_out.set_bank_offset(int(bank_offset*granularity), True)
 				bin_out.write_cram(cram)
 		
 		# write BRAM
