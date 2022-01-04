@@ -88,6 +88,8 @@ def run(args: Namespace) -> None:
 				out_grp.attrs.create("execution_time_in_s", data=timing[0], dtype=float)
 			
 			# set args as out_grp attributes
+			if args.description:
+				out_grp.attrs["description"] = args.description
 			out_grp.attrs.create("optimization_level", data=args.level, dtype="uint8")
 			for attr_name, dtype in [("chip_type", str), ("bram_banks", "uint8"), ("skip_comment", bool), ("bram_chunk_size", "uint16")]:#
 				value = getattr(args, attr_name)
@@ -123,6 +125,7 @@ def create_arg_parser() -> ArgumentParser:
 	parser.add_argument("-l", "--level", default=0, type=int, help="optimization level")
 	parser.add_argument("-s", "--skip-comment", action="store_true", help="skip the comment at the beginning of the output")
 	parser.add_argument("--bram-chunk-size", default=128, type=int, help="maximum size of BRAM that will be written in one go")
+	parser.add_argument("-d", "--description", type=str, help="description of the output to be added to HDF5 attributes")
 	
 	sub_parsers = parser.add_subparsers()
 	rewrite_parser = sub_parsers.add_parser("rewrite", help="rewrite the bitstream according to the other arguments")
