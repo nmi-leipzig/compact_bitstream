@@ -78,7 +78,23 @@ SPECS = (
 		{TileType.IO: 18, TileType.RAM_T: 42, TileType.RAM_B: 42, TileType.LOGIC: 54},
 		(
 			ExtraBit(0, 870, 270), ExtraBit(0, 871, 270), ExtraBit(1, 870, 271), ExtraBit(1, 871, 271),
-			ExtraBit(1, 870, 270), ExtraBit(1, 871, 270), ExtraBit(0, 870, 271), ExtraBit(0, 871, 271), 
+			ExtraBit(1, 870, 270), ExtraBit(1, 871, 270), ExtraBit(0, 870, 271), ExtraBit(0, 871, 271),
+		),
+	),
+	DeviceSpec(
+		"1k",
+		13,
+		17,
+		332,
+		144,
+		64,
+		256,
+		(3, 10),
+		BRAMIndicator(TilePosition(0, 0), Bit(1, 7), False),
+		{TileType.IO: 18, TileType.RAM_T: 42, TileType.RAM_B: 42, TileType.LOGIC: 54},
+		(
+			ExtraBit(0, 330, 142), ExtraBit(0, 331, 142), ExtraBit(1, 330, 143), ExtraBit(1, 331, 143),
+			ExtraBit(1, 330, 142), ExtraBit(1, 331, 142), ExtraBit(0, 330, 143), ExtraBit(0, 331, 143),
 		),
 	),
 )

@@ -123,7 +123,8 @@ def create_arg_parser() -> ArgumentParser:
 	parser.add_argument("--input-path", type=str, help="path inside the HDF5 file for the input bitstream; if group, all datasets inside will be processed")
 	parser.add_argument("--result-path", type=str, help="path inside the HDF5 file for the result")
 	
-	parser.add_argument("-c", "--chip-type", default="8k", type=str, choices=["8k"], help="type of FPGA")
+	parser.add_argument("-c", "--chip-type", default="8k", type=str, choices=["8k", "1k"
+	], help="type of FPGA")
 	parser.add_argument("-b", "--bram-banks", nargs="*", type=int, help="BRAM banks to be included in the bitstream")
 	parser.add_argument("-l", "--level", default=0, type=int, help="optimization level")
 	parser.add_argument("-s", "--skip-comment", action="store_true", help="skip the comment at the beginning of the output")
