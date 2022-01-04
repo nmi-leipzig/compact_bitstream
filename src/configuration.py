@@ -155,7 +155,10 @@ class BinOut:
 		self._bank_offset = offset
 	
 	def data_from_xram(self, xram: Banks) -> bytes:
-		return np.packbits(xram[self._bank_number, self._bank_offset:self._bank_offset+self._bank_height, :self._bank_width], bitorder="big").tobytes()
+		data = np.packbits(xram[self._bank_number, self._bank_offset:self._bank_offset+self._bank_height, :self._bank_width], bitorder="big").tobytes()
+		if len(data)*8 != self._bank_height*self._bank_width:
+			print(f"padding: {self._bank_height*self._bank_width} to {len(data)*8} {data[-1]:08b}")
+		return data
 	
 	def write_cram(self, cram: Banks) -> None:
 		data = self.data_from_xram(cram)
@@ -277,15 +280,18 @@ class Configuration:
 		
 		def get_data_len():
 			try:
-				return bank_width*bank_height//8
+				return (bank_width*bank_height+7)//8 # round up
 			except TypeError as te:
 				raise MalformedBitstreamError("Block height and width have to be set before writig data") from te
 		
 		def data_to_xram(data, xram):
 			for y in range(bank_height):
+				fst = y*bank_width//8
+				lst = ((y+1)*bank_width+7)//8 # round up
 				# msb first
 				bit_data = [
-					(b<<i) & 0x80 != 0 for b in data[y*bank_width//8:(y+1)*bank_width//8] for i in range(8)
+					(b<<i) & 0x80 != 0 for c, b in enumerate(data[fst:lst])
+					for i in range(max(0, y*bank_width-8*fst-8*c), min(8, (y+1)*bank_width-8*fst-8*c))
 				]
 				xram[bank_nr][y+bank_offset][0:bank_width] = bit_data
 			
@@ -312,11 +318,15 @@ class Configuration:
 			
 			if opcode == 0:
 				if payload == 1:
+					if bank_width != self._spec.cram_width:
+						raise ValueError(f"Wrong CRAM width: expected {self._spec.cram_width},but was {bank_width}")
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
 					data_to_xram(data, cram)
 					self.expect_bytes(bin_file, b"\x00\x00", crc, "Expected 0x{exp} after CRAM data, got 0x{val}")
 				elif payload == 3:
+					if bank_width != self._spec.bram_width:
+						raise ValueError(f"Wrong BRAM width: expected {self._spec.bram_width},but was {bank_width}")
 					data_len = get_data_len()
 					data = self.get_bytes_crc(bin_file, data_len, crc)
 					data_to_xram(data, bram)
