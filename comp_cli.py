@@ -103,7 +103,10 @@ def run(args: Namespace) -> None:
 			
 		elif args.function == benchmark:
 			print(res)
-			print(f"stdev: {statistics.stdev(res)}, mean: {statistics.mean(res)}")
+		
+		if args.function == benchmark:
+			for r in res:
+				print(f"stdev: {statistics.stdev(r)}, mean: {statistics.mean(r)}")
 		
 		if args.function == bitstream_from_args and args.output_bin:
 			with open(args.output_bin, "wb") as bin_file:
