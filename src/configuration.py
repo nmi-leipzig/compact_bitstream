@@ -42,6 +42,9 @@ class BinOpt:
 	# 4 -> in addition to 3, order writes by chunk size to reduce number of set height commands
 	optimize: int = 0
 	skip_comment: bool = False
+	# even if the CRAM width in bits is not a multiple of 8, the data of a chunk has to be a multipple of 8;
+	# the following flag forces also the data before each chunk (i.e. offset*cram_width) to be a multiple of 8
+	align_chunks: bool = True
 
 class CRC:
 	def __init__(self) -> None:
@@ -437,7 +440,7 @@ class Configuration:
 				bin_out.write_cram(cram)
 				continue
 			
-			areas = self.get_nonzero_chunks(cram[bank_number], granularity, False)
+			areas = self.get_nonzero_chunks(cram[bank_number], granularity, opt.align_chunks)
 			
 			if opt.optimize >= 4:
 				# sort by chunk size to set bank height less often
