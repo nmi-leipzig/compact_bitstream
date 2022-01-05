@@ -25,6 +25,7 @@ def bitstream_from_args(in_stream: BinaryIO, args: Namespace) -> bytes:
 		bram_banks = args.bram_banks,
 		optimize = args.level,
 		skip_comment = args.skip_comment,
+		align_chunks = not args.unaligned,
 	)
 	
 	return config.get_bitstream(opt)
@@ -91,7 +92,7 @@ def run(args: Namespace) -> None:
 			if args.description:
 				out_grp.attrs["description"] = args.description
 			out_grp.attrs.create("optimization_level", data=args.level, dtype="uint8")
-			for attr_name, dtype in [("chip_type", str), ("bram_banks", "uint8"), ("skip_comment", bool), ("bram_chunk_size", "uint16")]:#
+			for attr_name, dtype in [("chip_type", str), ("bram_banks", "uint8"), ("skip_comment", bool), ("bram_chunk_size", "uint16"), ("unaligned", bool)]:#
 				value = getattr(args, attr_name)
 				if value is None:
 					out_grp.attrs[attr_name] = h5py.Empty(dtype)
@@ -130,6 +131,7 @@ def create_arg_parser() -> ArgumentParser:
 	parser.add_argument("-s", "--skip-comment", action="store_true", help="skip the comment at the beginning of the output")
 	parser.add_argument("--bram-chunk-size", default=128, type=int, help="maximum size of BRAM that will be written in one go")
 	parser.add_argument("-d", "--description", type=str, help="description of the output to be added to HDF5 attributes")
+	parser.add_argument("-u", "--unaligned", action="store_true", help="allow unaligned CRAM chunks; only relevant for -c 1k and -l >=3")
 	
 	sub_parsers = parser.add_subparsers()
 	rewrite_parser = sub_parsers.add_parser("rewrite", help="rewrite the bitstream according to the other arguments")
