@@ -437,29 +437,15 @@ class Configuration:
 				bin_out.write_cram(cram)
 				continue
 			
-			# find none False rows
-			to_write = np.any(cram[bank_number], axis=1)
-			if granularity > 1:
-				to_write.resize((len(to_write)//granularity, granularity))
-				to_write = np.any(to_write, axis=1)
-			#print(np.nonzero(to_write))
-			prev_write = np.roll(to_write, 1)
-			prev_write[0] = False
-			next_write = np.roll(to_write, -1)
-			next_write[-1] = False
-			first_indices = np.nonzero(to_write & ~prev_write)[0]
-			last_indices = np.nonzero(to_write & ~next_write)[0]
-			chunk_size = last_indices - first_indices + 1
-			areas = np.column_stack((first_indices, chunk_size))
+			areas = self.get_nonzero_chunks(cram[bank_number], granularity, False)
 			
 			if opt.optimize >= 4:
 				# sort by chunk size to set bank height less often
 				areas = areas[areas[:, 1].argsort()]
 			
 			for bank_offset, bank_height in areas:
-				#print(f"{bank_offset}, {bank_height}")
-				bin_out.set_bank_height(int(bank_height*granularity), True)
-				bin_out.set_bank_offset(int(bank_offset*granularity), True)
+				bin_out.set_bank_height(int(bank_height), True)
+				bin_out.set_bank_offset(int(bank_offset), True)
 				bin_out.write_cram(cram)
 		
 		# write BRAM
@@ -645,6 +631,65 @@ class Configuration:
 				start = org_slice.stop + 1
 		
 		return slice(start, stop, step)
+	
+	@staticmethod
+	def set_with_granularity_aligned(to_write: np.ndarray, granularity: int) -> None:
+		assert len(to_write) % granularity == 0
+		
+		for i in range(0, len(to_write), granularity):
+			if any(to_write[i:i+granularity]):
+				to_write[i:i+granularity] = [True]*granularity
+	
+	@staticmethod
+	def set_with_granularity_unaligned(to_write: np.ndarray, granularity: int) -> None:
+		i = 0
+		while i < len(to_write):
+			if not to_write[i]:
+				i += 1
+				continue
+			for j in range(1, granularity):
+				try:
+					to_write[i+j] = True
+				except IndexError:
+					break
+			i += j + 1
+	
+	@classmethod
+	def get_nonzero_chunks(cls, data: np.ndarray, granularity: int, align: bool) -> np.ndarray:
+		"""Extracts which rows of data are nonzero and group them in chunks.
+		The length of each chunk will be divisable by the granularity. If the align flag is set the offset of each
+		chunk will also be divisable by the granularity.
+		
+		Returns a 2d-array with a row for each chunk, the first column as the offset of the chunks (i.e. the index
+		of the first data row of the chunks) the second column as the chunk length.
+		"""
+		# find none False rows
+		to_write = np.any(data, axis=1)
+		if granularity > 1:
+			if align:
+				cls.set_with_granularity_aligned(to_write, granularity)
+			else:
+				cls.set_with_granularity_unaligned(to_write, granularity)
+			
+		prev_write = np.roll(to_write, 1)
+		prev_write[0] = False
+		next_write = np.roll(to_write, -1)
+		next_write[-1] = False
+		first_indices = np.nonzero(to_write & ~prev_write)[0]
+		last_indices = np.nonzero(to_write & ~next_write)[0]
+		chunk_size = last_indices - first_indices + 1
+		
+		if not align and chunk_size[-1] % granularity != 0:
+			# for not aligned chunks the last chunk can be too short as there may be not enough rows following the last
+			# nonzero row to get a chunk of granularity size
+			# -> simply add the rows before to the chunk
+			# the added rows may be written twice
+			cor = granularity - (chunk_size[-1] % granularity)
+			chunk_size[-1] += cor
+			first_indices[-1] -= cor
+		assert all([c%granularity==0 for c in chunk_size]) # only full bytes are written to CRAM
+		
+		return np.column_stack((first_indices, chunk_size))
 	
 	@classmethod
 	def expect_bytes(cls, bin_file: BinaryIO, exp: bytes, crc: CRC, msg: str="Expected {exp} but got {val}") -> None:
