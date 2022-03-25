@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 
 import statistics
+import subprocess
 import time
 import timeit
 
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
 from io import BytesIO
-from typing import Any, BinaryIO, Callable, List, Tuple
+from typing import Any, BinaryIO, Callable, Dict, List, Tuple
 
 import h5py
 
 from src.configuration import BinOpt, Configuration
 from src.fpga_board import FPGABoard
 
-def bitstream_from_args(in_stream: BinaryIO, args: Namespace) -> bytes:
+def bitstream_from_args(in_stream: BinaryIO, args: Namespace, meta: List[Tuple[str, Any, Any]]) -> bytes:
 	config = Configuration.create_blank(args.chip_type)
 	
 	config.read_bin(in_stream)
@@ -30,10 +31,11 @@ def bitstream_from_args(in_stream: BinaryIO, args: Namespace) -> bytes:
 	
 	return config.get_bitstream(opt)
 
-def benchmark(in_stream: BinaryIO, args: Namespace) -> List[float]:
-	bitstream = bitstream_from_args(in_stream, args)
+def benchmark(in_stream: BinaryIO, args: Namespace, meta: Dict[str, Tuple[Any, Any]]) -> List[float]:
+	bitstream = bitstream_from_args(in_stream, args, meta)
 	
 	with FPGABoard.get_suitable_board() as fpga:
+		meta["board_serial_number"] = (fpga.serial_number, str)
 		res = timeit.repeat("fpga.flash_bitstream(bitstream)", repeat=args.repeat, number=args.number, globals={"fpga": fpga, "bitstream": bitstream})
 	
 	return res
@@ -46,6 +48,8 @@ def exec_time(func: Callable, *args, **kwargs) -> Tuple[Any, float]:
 	return res, end-start
 
 def run(args: Namespace) -> None:
+	git_ver = subprocess.check_output(["git", "describe", "--always"], universal_newlines=True).strip()
+	meta = {"compact_version": (git_ver, str)}
 	with ExitStack() as stack:
 		in_batch = []
 		if args.input_bin:
@@ -65,7 +69,7 @@ def run(args: Namespace) -> None:
 				ds_list = [n[1] for n in name_ds_list]
 			in_batch.extend([BytesIO(d[:].tobytes()) for d in ds_list])
 		
-		timing_res = [exec_time(args.function, b, args) for b in in_batch]
+		timing_res = [exec_time(args.function, b, args, meta) for b in in_batch]
 		res = [r[0] for r in timing_res]
 		timing = [r[1] for r in timing_res]
 		
@@ -92,8 +96,8 @@ def run(args: Namespace) -> None:
 			if args.description:
 				out_grp.attrs["description"] = args.description
 			out_grp.attrs.create("optimization_level", data=args.level, dtype="uint8")
-			for attr_name, dtype in [("chip_type", str), ("bram_banks", "uint8"), ("skip_comment", bool), ("bram_chunk_size", "uint16"), ("unaligned", bool)]:#
-				value = getattr(args, attr_name)
+			meta.update({a: (getattr(args, a), d) for a, d in [("chip_type", str), ("bram_banks", "uint8"), ("skip_comment", bool), ("bram_chunk_size", "uint16"), ("unaligned", bool)]})
+			for attr_name, (value, dtype) in meta.items():#
 				if value is None:
 					out_grp.attrs[attr_name] = h5py.Empty(dtype)
 					continue
