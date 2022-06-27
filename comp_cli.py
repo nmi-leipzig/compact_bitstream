@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import statistics
 import subprocess
 import time
@@ -47,8 +48,19 @@ def exec_time(func: Callable, *args, **kwargs) -> Tuple[Any, float]:
 	
 	return res, end-start
 
-def run(args: Namespace) -> None:
+def get_git_version() -> str:
+	# ensure we are in the directory of the compression program
+	org_dir = os.getcwd()
+	os.chdir(os.path.dirname(os.path.realpath(__file__)))
+	
 	git_ver = subprocess.check_output(["git", "describe", "--always"], universal_newlines=True).strip()
+	
+	os.chdir(org_dir)
+	
+	return git_ver
+
+def run(args: Namespace) -> None:
+	git_ver = get_git_ver()
 	meta = {"compact_version": (git_ver, str)}
 	with ExitStack() as stack:
 		in_batch = []
