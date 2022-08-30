@@ -60,7 +60,7 @@ def get_git_version() -> str:
 	return git_ver
 
 def run(args: Namespace) -> None:
-	git_ver = get_git_ver()
+	git_ver = get_git_version()
 	meta = {"compact_version": (git_ver, str)}
 	with ExitStack() as stack:
 		in_batch = []
